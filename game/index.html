@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23ffd23e'/%3E%3Ctext x='16' y='23' font-size='20' font-family='Arial' font-weight='bold' text-anchor='middle' fill='%23231a00'%3ES%3C/text%3E%3C/svg%3E">
+<title>SOLMAR — an open-world crime game</title>
+<style>
+  html, body { margin: 0; padding: 0; overflow: hidden; background: #0e1420;
+    font-family: 'Segoe UI', Arial, sans-serif; color: #fff; }
+  #game { position: fixed; inset: 0; }
+  #game canvas { display: block; }
+  .hidden { display: none !important; }
+  /* ---------- HUD ---------- */
+  #hud { position: fixed; inset: 0; pointer-events: none; z-index: 5; }
+  #top-left { position: absolute; top: 14px; left: 16px; }
+  #health-bar { width: 180px; height: 14px; background: rgba(0,0,0,.55);
+    border: 1px solid rgba(255,255,255,.35); border-radius: 7px; overflow: hidden; }
+  #health-fill { height: 100%; width: 100%; background: linear-gradient(90deg,#37d67a,#a8e063); }
+  #health-text { font-size: 12px; text-shadow: 0 1px 2px #000; margin-top: 2px; }
+  #money { margin-top: 8px; font-size: 26px; font-weight: 800; color: #7dff9e;
+    text-shadow: 0 2px 4px #000; }
+  #stars { position: absolute; top: 12px; right: 18px; font-size: 30px;
+    letter-spacing: 4px; color: #ffd23e; text-shadow: 0 2px 4px #000; }
+  #stars.hot { color: #ff5a3c; animation: pulse .5s infinite alternate; }
+  @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.08); } }
+  #objective { position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+    max-width: 560px; background: rgba(0,0,0,.55); padding: 8px 16px; border-radius: 8px;
+    font-size: 15px; text-align: center; border-left: 4px solid #ffd23e; }
+  #speed { position: absolute; right: 20px; bottom: 18px; font-size: 40px; font-weight: 800;
+    text-shadow: 0 2px 6px #000; text-align: right; }
+  #speed-unit { position: absolute; right: 20px; bottom: 62px; font-size: 14px; color: #cfe3ff;
+    text-shadow: 0 1px 2px #000; }
+  #minimap-wrap { position: absolute; left: 16px; bottom: 16px; }
+  #minimap { border: 2px solid rgba(255,255,255,.5); border-radius: 8px;
+    background: #20262b; box-shadow: 0 2px 8px rgba(0,0,0,.5); }
+  #minimap-label { font-size: 11px; letter-spacing: 2px; color: #cfe3ff;
+    text-shadow: 0 1px 2px #000; margin-bottom: 3px; }
+  #toast { position: absolute; left: 50%; bottom: 110px; transform: translateX(-50%);
+    background: rgba(0,0,0,.72); padding: 10px 20px; border-radius: 8px; font-size: 15px;
+    opacity: 0; transition: opacity .3s; max-width: 640px; text-align: center; }
+  #toast.show { opacity: 1; }
+  #mission-done { position: absolute; left: 50%; top: 26%; transform: translateX(-50%);
+    background: rgba(20,60,20,.85); border: 1px solid #7dff9e; padding: 14px 26px;
+    border-radius: 10px; font-size: 19px; font-weight: 700; opacity: 0; transition: opacity .3s; }
+  #mission-done.show { opacity: 1; }
+  #controls-hint { position: absolute; right: 20px; bottom: 90px; font-size: 12px;
+    color: #dfe8f5; text-shadow: 0 1px 2px #000; text-align: right; line-height: 1.5; }
+  /* ---------- menus ---------- */
+  .menu { position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center;
+    background: linear-gradient(180deg, rgba(10,20,40,.82), rgba(20,10,30,.88)); }
+  .menu h1 { font-size: 74px; margin: 0; letter-spacing: 10px; color: #ffd23e;
+    text-shadow: 0 4px 0 #b8860b, 0 8px 24px rgba(0,0,0,.7); }
+  .menu h2 { font-size: 20px; font-weight: 400; color: #ffe9a8; margin: 6px 0 18px; }
+  .menu p { max-width: 620px; font-size: 15px; line-height: 1.6; color: #e8eef7; }
+  .menu button { pointer-events: auto; margin: 8px; padding: 13px 34px; font-size: 17px;
+    font-weight: 700; border: none; border-radius: 8px; cursor: pointer;
+    background: #ffd23e; color: #231a00; box-shadow: 0 3px 0 #b8860b; }
+  .menu button.secondary { background: #2e4a6b; color: #fff; box-shadow: 0 3px 0 #16283d; }
+  .menu button:hover { filter: brightness(1.1); }
+  .menu .keys { font-size: 13px; color: #b9c6d8; margin-top: 14px; line-height: 1.8; }
+  #saved-note { font-size: 12px; color: #7dff9e; margin-top: 6px; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.min.js" } }
+</script>
+</head>
+<body>
+<div id="game"></div>
+
+<div id="hud">
+  <div id="top-left">
+    <div id="health-bar"><div id="health-fill"></div></div>
+    <div id="health-text">100</div>
+    <div id="money">$0</div>
+  </div>
+  <div id="stars">☆☆☆☆☆</div>
+  <div id="objective"></div>
+  <div id="minimap-wrap">
+    <div id="minimap-label">SOLMAR CITY</div>
+    <canvas id="minimap" width="190" height="190"></canvas>
+  </div>
+  <div id="speed">ON FOOT</div>
+  <div id="speed-unit"></div>
+  <div id="controls-hint">WASD move &nbsp;·&nbsp; Shift run &nbsp;·&nbsp; Space jump / handbrake<br>
+    E enter / steal car &nbsp;·&nbsp; F punch &nbsp;·&nbsp; H horn &nbsp;·&nbsp; Esc pause</div>
+  <div id="toast"></div>
+  <div id="mission-done"></div>
+</div>
+
+<div id="menu-start" class="menu">
+  <h1>SOLMAR</h1>
+  <h2>Solmar City — a sun-soaked open world</h2>
+  <p>Leo, a cab driver in debt to Mara Voss, has five jobs to run across the
+    city: deliveries, a stolen Sunrunner, a police chase, three drops and a
+    sunset race. Walk the streets or take any car you see — but the police
+    are watching, and every crime raises your wanted level.</p>
+  <button id="btn-start">START — Press Enter</button>
+  <button id="btn-continue" class="secondary hidden">CONTINUE — load save</button>
+  <div id="saved-note"></div>
+  <div class="keys">WASD move · mouse look · Shift run · Space jump / handbrake ·
+    E enter or steal a car · F punch · H horn · Esc pause</div>
+</div>
+
+<div id="menu-pause" class="menu hidden">
+  <h1 style="font-size:48px">PAUSED</h1>
+  <p>Take a breath, Leo. The city waits.</p>
+  <button id="btn-resume">RESUME</button>
+  <button id="btn-restart" class="secondary">RESTART STORY</button>
+  <div class="keys">Esc to resume</div>
+</div>
+
+<div id="menu-busted" class="menu hidden">
+  <h1 style="font-size:48px">BUSTED</h1>
+  <p>The Solmar police caught up with you.</p>
+  <p id="busted-fine"></p>
+  <button id="btn-busted">BACK ON THE STREET — Press Enter</button>
+</div>
+
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
